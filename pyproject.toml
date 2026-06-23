@@ -8,7 +8,7 @@ dependencies = [
     # Data loading & processing
     "pandas>=2.0",
     "numpy>=1.24",
-    "datasets>=2.14",
+    "datasets>=2.14,<3",
     # Deep learning recommendation
     "torch>=2.2",
     "scikit-learn>=1.3",
