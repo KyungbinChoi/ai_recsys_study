@@ -1,0 +1,38 @@
+[project]
+name = "ai-recsys-study"
+version = "0.1.0"
+description = "AI Recommendation System Study — LLM curation + Deep Learning (Amazon Reviews)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Data loading & processing
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "datasets>=2.14",
+    # Deep learning recommendation
+    "torch>=2.2",
+    "scikit-learn>=1.3",
+    # Chatbot UI
+    "streamlit>=1.35",
+    # Utilities
+    "tqdm>=4.66",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "rich>=13.0",
+    "google-genai>=2.9.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "jupyter>=1.0",
+    "ipykernel>=6.29",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["models", "llm", "ui"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
