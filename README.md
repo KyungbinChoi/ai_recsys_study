@@ -180,7 +180,7 @@ ai_recsys_study/
 ```
 [✅] 1. 환경 설정 (uv + 의존성)
 [✅] 2. 데이터 수집 & EDA (01_data_fetch.ipynb)
-[ ]  3. 전처리 파이프라인 (k-core, 인코딩, split)
+[✅] 3. 전처리 파이프라인 (k-core, 인코딩, split)
 [ ]  4. MF 베이스라인 구현 & 평가
 [ ]  5. NCF 구현 & MF와 성능 비교
 [ ]  6. SASRec 구현 & 시퀀셜 패턴 분석
