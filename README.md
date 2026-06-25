@@ -46,11 +46,26 @@ Amazon Reviews 2023 데이터셋을 기반으로 **딥러닝 추천 모델**과 
 | 단계 | 내용 |
 |------|------|
 | 수집 | HuggingFace `datasets` — `McAuley-Lab/Amazon-Reviews-2023` (All_Beauty) |
-| 전처리 | User/Item ID 인코딩, k-core 필터링(cold-start 제거), train/test split |
+| 쿼리/집계 | **DuckDB** — parquet 파일 직접 SQL 쿼리, k-core 필터링, 통계 집계 |
+| 전처리 | User/Item ID 인코딩, train/test split (leave-one-out) |
 | 저장 | `data/processed/All_Beauty/*.parquet` |
 
 **k-core 필터링:** 최소 k개 이상의 상호작용이 있는 유저·아이템만 남깁니다.
 실제 추천 시스템에서 cold-start 문제를 줄이는 표준 전처리 방식입니다.
+
+**DuckDB를 쓰는 이유:** pandas는 데이터를 전부 메모리에 올린 후 연산하지만,
+DuckDB는 parquet 파일을 직접 쿼리해 필요한 부분만 처리합니다.
+```python
+# k-core 필터 예시 — pandas 대비 빠르고 메모리 효율적
+duckdb.sql("""
+    SELECT user_id, parent_asin, rating, timestamp
+    FROM 'reviews.parquet'
+    WHERE user_id IN (
+        SELECT user_id FROM 'reviews.parquet'
+        GROUP BY user_id HAVING COUNT(*) >= 5
+    )
+""").df()
+```
 
 ---
 
@@ -90,6 +105,14 @@ Output:      sigmoid(GMF output + MLP output)
 - **학습 목표:** 정적 협업 필터링의 한계와 시퀀셜 모델링의 필요성, Attention 작동 원리 이해.
 
 **평가 지표:** `Hit@10`, `NDCG@10`
+
+#### RecBole — 검증 도구로 활용
+직접 구현한 모델의 결과를 RecBole(94개 모델 내장 라이브러리)의 공식 구현과 비교해
+구현 정확도를 검증합니다. 블랙박스로 사용하지 않고, 성능 차이가 나면 소스 코드를 열어
+원인을 역설계합니다.
+```
+내 구현 결과  vs.  RecBole 기준값  →  차이 분석 → 개념 심화
+```
 
 ---
 
@@ -189,11 +212,14 @@ uv run streamlit run ui/app.py
 
 ## 기술 스택
 
-| 역할 | 라이브러리 |
-|------|-----------|
-| 딥러닝 | PyTorch |
-| 데이터 | HuggingFace datasets, pandas |
-| LLM | Google Gemini (`google-genai`) |
-| UI | Streamlit |
-| ML 유틸 | scikit-learn |
-| 개발 환경 | uv, Jupyter |
+| 역할 | 라이브러리 | 비고 |
+|------|-----------|------|
+| 딥러닝 모델 구현 | `torch` | 모델 직접 구현 |
+| 추천 모델 검증 | `recbole` (dev) | 직접 구현과 비교용 기준값 |
+| 데이터 로드 | `datasets` (HuggingFace) | Amazon Reviews 2023 |
+| 데이터 쿼리/전처리 | `duckdb` | parquet 직접 SQL 쿼리 |
+| 데이터 변환 | `pandas` | ML 파이프라인 인터페이스 |
+| LLM 큐레이션 | `google-genai` (Gemini) | 쿼리 이해, 설명 생성 |
+| 챗봇 UI | `streamlit` | 쇼핑 챗봇 |
+| ML 유틸 | `scikit-learn` | 평가 지표, 인코딩 |
+| 개발 환경 | `uv`, `jupyter` | 패키지 관리, 노트북 |
