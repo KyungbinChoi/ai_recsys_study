@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.0",
     "rich>=13.0",
     "google-genai>=2.9.0",
+    "duckdb>=1.5.4",
 ]
 
 [tool.uv]
@@ -28,6 +29,7 @@ dev-dependencies = [
     "ipykernel>=6.29",
     "matplotlib>=3.7",
     "seaborn>=0.12",
+    "recbole>=1.2.1",
 ]
 
 [tool.hatch.build.targets.wheel]
