@@ -185,7 +185,7 @@ ai_recsys_study/
 [✅] 5. NCF 구현 & MF와 성능 비교
 [✅] 6. SASRec 구현 & 시퀀셜 패턴 분석
 [✅] 7. Gemini 큐레이션 모듈 구현
-[ ]  8. Streamlit 챗봇 UI 구현
+[✅] 8. Streamlit 챗봇 UI 구현
 [ ]  9. 전체 파이프라인 통합
 ```
 
