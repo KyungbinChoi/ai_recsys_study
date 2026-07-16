@@ -55,7 +55,7 @@ class RecommendationPipeline:
         api_key: str | None = None,
         data_dir: Path = DATA_DIR,
         model_name: str = "sasrec",
-        gemini_model: str = "gemini-2.0-flash",
+        gemini_model: str = "gemini-3.5-flash",
     ) -> "RecommendationPipeline":
         from models.sasrec import SASRec
         from scripts.train import MAX_LEN as _MAX_LEN
@@ -113,13 +113,18 @@ class RecommendationPipeline:
                 features = []
             else:
                 row      = rows.iloc[0]
-                title    = str(row.get("title") or asin)
+                title_raw = row.get("title")
+                title    = str(title_raw) if pd.notna(title_raw) else asin
                 rating   = float(row["average_rating"]) if pd.notna(row.get("average_rating")) else None
                 n_rating = int(row["rating_number"])   if pd.notna(row.get("rating_number"))   else None
                 price_raw = row.get("price")
                 price    = str(price_raw) if pd.notna(price_raw) else None
-                feats    = row.get("features") or []
-                features = list(feats)[:5] if feats else []
+                feats_raw = row.get("features")
+                features = (
+                    [str(f) for f in feats_raw[:5] if f is not None]
+                    if feats_raw is not None and len(feats_raw) > 0
+                    else []
+                )
 
             result.append(ItemInfo(
                 item_id=item_id,

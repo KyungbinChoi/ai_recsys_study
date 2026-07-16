@@ -14,7 +14,6 @@ Gemini 기반 LLM 큐레이션 모듈.
     result = curator.curate(ctx, items, top_k=5)
 """
 
-import json
 import os
 from typing import Generator
 
@@ -29,7 +28,7 @@ from llm.prompts import (
 )
 
 
-# ── Pydantic 모델 ──────────────────────────────────────────────────────────────
+# ── 공개 Pydantic 모델 ────────────────────────────────────────────────────────
 
 class UserContext(BaseModel):
     intent: str = Field(description="유저 의도 요약")
@@ -58,6 +57,16 @@ class CuratedItem(BaseModel):
     dl_rank: int = Field(description="DL 모델 원래 순위 (1-indexed)")
 
 
+# ── 내부 스키마 (curate() 출력 전용) ─────────────────────────────────────────
+
+class _RankedItem(BaseModel):
+    item_id: int
+    reason: str
+
+class _RerankOutput(BaseModel):
+    items: list[_RankedItem]
+
+
 # ── Curator ────────────────────────────────────────────────────────────────────
 
 class Curator:
@@ -72,14 +81,13 @@ class Curator:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gemini-2.0-flash",
+        model: str = "gemini-3.5-flash",
     ):
         try:
             from google import genai
         except ImportError as e:
             raise ImportError("google-genai 패키지를 설치해주세요: uv add google-genai") from e
 
-        self._genai = genai
         self.model = model
         key = api_key or os.environ.get("GEMINI_API_KEY")
         if not key:
@@ -91,7 +99,7 @@ class Curator:
     def understand_query(self, query: str) -> UserContext:
         """
         자연어 쿼리를 구조화된 UserContext로 변환.
-        Gemini JSON mode를 사용해 파싱 없이 바로 dict를 받음.
+        response_schema=UserContext → Gemini가 스키마를 강제하므로 파싱 오류 없음.
         """
         from google.genai import types
 
@@ -100,12 +108,12 @@ class Curator:
             contents=QUERY_UNDERSTANDING_USER.format(query=query),
             config=types.GenerateContentConfig(
                 system_instruction=QUERY_UNDERSTANDING_SYSTEM,
+                response_schema=UserContext,
                 response_mime_type="application/json",
                 temperature=0.1,
             ),
         )
-        raw = json.loads(response.text)
-        return UserContext(**raw)
+        return response.parsed
 
     # ── 재순위 + 설명 ──────────────────────────────────────────────────────────
 
@@ -117,64 +125,50 @@ class Curator:
     ) -> list[CuratedItem]:
         """
         DL 모델의 후보 목록을 재순위하고 개인화 설명을 생성.
-
-        Args:
-            user_context: understand_query()의 결과
-            candidates:   DL 모델이 생성한 Top-K 후보 (순서: DL 모델 rank 순)
-            top_k:        최종 반환할 아이템 수
-
-        Returns:
-            CuratedItem 리스트 (Gemini 추천 순서)
+        response_schema=_RerankOutput → items 리스트 스키마를 Gemini가 보장.
         """
         from google.genai import types
 
-        # 후보를 dict로 변환 (프롬프트 포매팅용)
         candidates_dicts = [c.model_dump() for c in candidates]
         candidates_text  = format_candidates(candidates_dicts)
 
-        prompt = RERANK_USER.format(
-            intent=user_context.intent,
-            preferences=", ".join(user_context.preferences) or "없음",
-            constraints=", ".join(user_context.constraints) or "없음",
-            candidates_text=candidates_text,
-        )
-
-        system = RERANK_SYSTEM.format(
-            top_k=top_k,
-            language=user_context.language,
-        )
-
         response = self.client.models.generate_content(
             model=self.model,
-            contents=prompt,
+            contents=RERANK_USER.format(
+                intent=user_context.intent,
+                preferences=", ".join(user_context.preferences) or "없음",
+                constraints=", ".join(user_context.constraints) or "없음",
+                candidates_text=candidates_text,
+            ),
             config=types.GenerateContentConfig(
-                system_instruction=system,
+                system_instruction=RERANK_SYSTEM.format(
+                    top_k=top_k,
+                    language=user_context.language,
+                ),
+                response_schema=_RerankOutput,
                 response_mime_type="application/json",
                 temperature=0.3,
             ),
         )
 
-        ranked_raw: list[dict] = json.loads(response.text)
+        ranked: list[_RankedItem] = response.parsed.items
+        id2item  = {c.item_id: c for c in candidates}
+        id2index = {c.item_id: i + 1 for i, c in enumerate(candidates)}
 
-        # item_id로 원본 ItemInfo 매핑
-        id2item = {c.item_id: c for c in candidates}
         result = []
-        for llm_rank, raw in enumerate(ranked_raw[:top_k], start=1):
-            iid = raw["item_id"]
-            item = id2item.get(iid)
+        for ranked_item in ranked[:top_k]:
+            item = id2item.get(ranked_item.item_id)
             if item is None:
                 continue
-            result.append(
-                CuratedItem(
-                    item_id=iid,
-                    title=item.title,
-                    reason=raw["reason"],
-                    avg_rating=item.avg_rating,
-                    rating_count=item.rating_count,
-                    price=item.price,
-                    dl_rank=candidates_dicts.index(item.model_dump()) + 1,
-                )
-            )
+            result.append(CuratedItem(
+                item_id=ranked_item.item_id,
+                title=item.title,
+                reason=ranked_item.reason,
+                avg_rating=item.avg_rating,
+                rating_count=item.rating_count,
+                price=item.price,
+                dl_rank=id2index[ranked_item.item_id],
+            ))
         return result
 
     # ── 스트리밍 설명 (UI 용) ──────────────────────────────────────────────────
