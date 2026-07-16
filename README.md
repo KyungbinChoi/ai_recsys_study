@@ -154,7 +154,8 @@ ai_recsys_study/
 │   └── sasrec.py                   # Self-Attentive Sequential Rec
 │
 ├── llm/
-│   ├── curator.py                  # Gemini 큐레이션 로직
+│   ├── curator.py                  # Gemini 큐레이션 로직 (Pydantic 스키마 강제)
+│   ├── pipeline.py                 # SASRec + Gemini 통합 파이프라인
 │   └── prompts.py                  # 프롬프트 템플릿
 │
 ├── ui/
@@ -186,7 +187,7 @@ ai_recsys_study/
 [✅] 6. SASRec 구현 & 시퀀셜 패턴 분석
 [✅] 7. Gemini 큐레이션 모듈 구현
 [✅] 8. Streamlit 챗봇 UI 구현
-[ ]  9. 전체 파이프라인 통합
+[✅] 9. 전체 파이프라인 통합
 ```
 
 ---
